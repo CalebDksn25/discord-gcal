@@ -1,4 +1,4 @@
-## SETUP INSTRUCTIONS
+# SETUP INSTRUCTIONS
 
 **If you already have UV installed, skip first step**
 
@@ -8,13 +8,15 @@
 brew install uv
 ```
 
-_Verify Installation_
+_Verify installation_
 
-````bash
-uv --version```
+```bash
+uv --version
+```
 
 ### **2- Create and activate virtual enviorment**
+
 ```bash
 uv venv
-source .venv/bin/activate```
-````
+source .venv/bin/activate
+```

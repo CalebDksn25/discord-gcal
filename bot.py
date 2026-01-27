@@ -2,6 +2,8 @@ import os
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
+from lib.parser import parse_text, ParsedItem
+from lib.ui import ConfirmView
 
 # Load the environmental variables from .env file
 load_dotenv()
@@ -9,6 +11,9 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 # Server ID (Right click on server -> Copy ID)
 GUILD_ID = 1465479190697611329
+
+# Add small pending items storage
+PENDING = {}
 
 class MyClient(discord.Client):
 
@@ -51,8 +56,21 @@ async def help_command(interaction: discord.Interaction):
 @app_commands.describe(text="What do you want to add?")
 async def add(interaction: discord.Interaction, text: str):
     # Placeholder for NLP processing logic
-    await interaction.response.send_message(f"Recieved your request to add: {text}", ephemeral=True)
+    item = parse_text(text)
+    PENDING[interaction.user.id] = item
 
+    async def on_confirm(interaction2: discord.Interaction):
+        item2 = PENDING.pop(interaction2.user.id, None)
+        await interaction2.response.send_message(f"Confirmed adding: {item2}", ephemeral=True)
+    
+    async def on_cancel(interaction2: discord.Interaction):
+        PENDING.pop(interaction2.user.id, None)
+        await interaction2.response.send_message(f"Cancelled adding item.", ephemeral=True)
+
+    await interaction.response.send_message(
+        f"Preview:\nType: {item.kind}\nTitle: {item.title}\nWhen: {item.when}\nLocation: {item.location}\n\nConfirm adding this item?",
+        view = ConfirmView(interaction.user.id, on_confirm, on_cancel), ephemeral=True
+    )
 
 # Ensure we have a token before running the bot
 if not TOKEN:

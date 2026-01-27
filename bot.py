@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed
 from lib.openai_client import get_openai_response
+from lib.google_calendar import create_calendar_event, create_task
+from lib.google_auth import get_creds
 
 # Load the environmental variables from .env file
 load_dotenv()
@@ -62,15 +64,39 @@ async def add(interaction: discord.Interaction, text: str):
 
     async def on_confirm(interaction2: discord.Interaction):
         item_dict = PENDING.pop(interaction2.user.id, None)
-        if item_dict:
-            item_type = item_dict.get("type", "item")
-            title = item_dict.get("title", "Untitled")
+
+        # If no pending item, inform the user
+        if not item_dict:
+            await interaction2.response.send_message("No pending item found.", ephemeral=True)
+            return
+
+        # Get Google API credentials
+        creds = get_creds()      
+
+        # Depending on the type, create calendar event or task
+        if item_dict["type"] == "event":
+            if not item_dict.get("start_time") or not item_dict.get("end_time"):
+                await interaction2.response.send_message(
+                    "Missing start/end time for event. Try rephrasing.",
+                    ephemeral=True
+                )
+
+            # Create the appropriate item
+            link = create_calendar_event(creds, item_dict)
+            
+        else:
+            # Assume its a task
+            task_id = create_task(creds, item_dict)
+            #link = f"https://tasks.google.com/embed/list/@default/task/{task_id}"
             await interaction2.response.send_message(
-                f"✅ Confirmed adding {item_type}: **{title}**",
+                f"Added task: **{item_dict['title'].title()}**\nTask ID: {task_id}",
                 ephemeral=True
             )
-        else:
-            await interaction2.response.send_message("Item not found.", ephemeral=True)
+
+        # Notify the user of successful addition 
+        await interaction2.response.send_message(
+            f"Added Event: **{item_dict['title'].title()}**\n{link}"
+        )
     
     async def on_cancel(interaction2: discord.Interaction):
         PENDING.pop(interaction2.user.id, None)

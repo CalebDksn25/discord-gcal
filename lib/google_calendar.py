@@ -75,14 +75,18 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
     events = events_result.get('items', [])
 
     # Fetch today's tasks from Google Tasks
+    # Note: Google Tasks uses date-only format for 'due' field, so we need to use date strings
+    # dueMin is inclusive, dueMax is exclusive, so we need to set dueMax to tomorrow
+    tomorrow = date + timedelta(days=1)
     tasks_result = tasks_service.tasks().list(
         tasklist=tasklist_id,
         showCompleted=True,
-        dueMax=end_of_day,
-        dueMin=start_of_day
+        dueMax=tomorrow.isoformat() + 'T00:00:00Z',  # Up to (but not including) tomorrow
+        dueMin=start_of_day  # From start of today
     ).execute()
 
     tasks = tasks_result.get('items', [])
+    print("Fetched tasks:", len(tasks), "items")
     
     # Return the events and tasks for the day
     return {

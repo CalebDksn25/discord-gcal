@@ -3,6 +3,7 @@ import json
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
+from datetime import datetime
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed
 from lib.openai_client import get_openai_response
@@ -74,15 +75,35 @@ async def list_items(interaction: discord.Interaction):
         response_lines.append("\n**Events:**")
         for event in items["events"]:
             start = event.get("start").get("dateTime", event.get("start").get("date"))
-            response_lines.append(f"- {event.get('summary')} at {start}")
+            # Parse and format the datetime
+            try:
+                dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                formatted_time = dt.strftime("%I:%M %p")  # e.g., "07:00 PM"
+                response_lines.append(f"- {event.get('summary')} at {formatted_time}")
+            except:
+                response_lines.append(f"- {event.get('summary')} at {start}")
+    else:
+        response_lines.append("\nNo events found for today.")
+
     if items["tasks"]:
         response_lines.append("\n**Tasks:**")
         for task in items["tasks"]:
-            due = task.get("due", "No due date")
-            response_lines.append(f"- {task.get('title')} (Due: {due})")
+            due = task.get("due")
+            if due:
+                # Parse and format the due date
+                try:
+                    dt = datetime.fromisoformat(due.replace('Z', '+00:00'))
+                    formatted_date = dt.strftime("%b %d, %Y")  # e.g., "Jan 27, 2026"
+                    response_lines.append(f"- {task.get('title')} (Due: {formatted_date})")
+                except:
+                    response_lines.append(f"- {task.get('title')} (Due: {due})")
+            else:
+                response_lines.append(f"- {task.get('title')} (No due date)")
+    else:
+        response_lines.append("\nNo tasks found for today.")
 
     await interaction.followup.send("\n".join(response_lines), ephemeral=True)
-    
+
 
 # Define the /add command 
 @client.tree.command(name="add", description="Add a new event or task using NLP")
@@ -109,23 +130,23 @@ async def add(interaction: discord.Interaction, text: str):
                     "Missing start/end time for event. Try rephrasing.",
                     ephemeral=True
                 )
+                return
 
             # Create the appropriate item
             link = create_calendar_event(creds, item_dict)
+            await interaction2.response.send_message(
+                f"Added Event: **{item_dict['title'].title()}**\n{link}",
+                ephemeral=True
+            )
 
         else:
             # Assume its a task
             task_id = create_task(creds, item_dict)
-            #link = f"https://tasks.google.com/embed/list/@default/task/{task_id}"
+            link = f"https://tasks.google.com/embed/list/@default/task/{task_id}"
             await interaction2.response.send_message(
-                f"Added task: **{item_dict['title'].title()}**\nTask ID: {task_id}",
+                f"Added task: **{item_dict['title'].title()}**\n{link}",
                 ephemeral=True
             )
-
-        # Notify the user of successful addition 
-        await interaction2.response.send_message(
-            f"Added Event: **{item_dict['title'].title()}**\n{link}"
-        )
     
     async def on_cancel(interaction2: discord.Interaction):
         PENDING.pop(interaction2.user.id, None)

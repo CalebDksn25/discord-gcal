@@ -57,16 +57,20 @@ async def help_command(interaction: discord.Interaction):
 @client.tree.command(name="add", description="Add a new event or task using NLP")
 @app_commands.describe(text="What do you want to add?")
 async def add(interaction: discord.Interaction, text: str):
-    # Placeholder for NLP processing logic
-    item = parse_text(text)
-    PENDING[interaction.user.id] = item
-    
     # Acknowledge quickly to avoid interaction timeout
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     async def on_confirm(interaction2: discord.Interaction):
-        item2 = PENDING.pop(interaction2.user.id, None)
-        await interaction2.response.send_message(f"Confirmed adding: {item2}", ephemeral=True)
+        item_dict = PENDING.pop(interaction2.user.id, None)
+        if item_dict:
+            item_type = item_dict.get("type", "item")
+            title = item_dict.get("title", "Untitled")
+            await interaction2.response.send_message(
+                f"✅ Confirmed adding {item_type}: **{title}**",
+                ephemeral=True
+            )
+        else:
+            await interaction2.response.send_message("Item not found.", ephemeral=True)
     
     async def on_cancel(interaction2: discord.Interaction):
         PENDING.pop(interaction2.user.id, None)
@@ -83,6 +87,9 @@ async def add(interaction: discord.Interaction, text: str):
             ephemeral=True,
         )
         return
+
+    # Store the AI payload for confirmation
+    PENDING[interaction.user.id] = ai_payload
 
     # Build the embed structure
     embed = build_preview_embed(ai_payload)

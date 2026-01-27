@@ -67,7 +67,7 @@ async def list_items(interaction: discord.Interaction):
     # List today's items
     items = list_today_items(creds)
 
-    if not items["events"] and not items["tasks"]:
+    if not items["events"] and not items["tasks"] and not items["completed"]:
         await interaction.followup.send("No events or tasks found for today.", ephemeral=True)
         return
     response_lines = ["**Today's Events and Tasks:**"]
@@ -101,6 +101,13 @@ async def list_items(interaction: discord.Interaction):
                 response_lines.append(f"- {task.get('title')} (No due date)")
     else:
         response_lines.append("\nNo tasks found for today.")
+    
+    if items["completed"]:
+        response_lines.append("\n**Completed Items:**")
+        for completed in items["completed"]:
+            response_lines.append(f"~~{completed.get('title')}~~")
+    else:
+        response_lines.append("\nNo completed items for today.")
 
     await interaction.followup.send("\n".join(response_lines), ephemeral=True)
 
@@ -139,7 +146,7 @@ async def add(interaction: discord.Interaction, text: str):
                 ephemeral=True
             )
 
-        else:
+        elif item_dict["type"] == "tasks":
             # Assume its a task
             task_id = create_task(creds, item_dict)
             link = f"https://tasks.google.com/embed/list/@default/task/{task_id}"

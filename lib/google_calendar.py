@@ -54,6 +54,10 @@ Function to list all of the current task and events on the users calendar for cu
 """
 
 def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@default") -> dict:
+
+    # Default completed array set to nothing
+    completed = []
+
     # Build the Google Calendar and Tasks services
     service = build("calendar", "v3", credentials=creds)
     tasks_service = build("tasks", "v1", credentials=creds)
@@ -81,6 +85,7 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
     tasks_result = tasks_service.tasks().list(
         tasklist=tasklist_id,
         showCompleted=True,
+        showHidden=True,
         dueMax=tomorrow.isoformat() + 'T00:00:00Z',  # Up to (but not including) tomorrow
         dueMin=start_of_day  # From start of today
     ).execute()
@@ -88,8 +93,19 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
     tasks = tasks_result.get('items', [])
     print("Fetched tasks:", len(tasks), "items")
     
+    # Separate completed and incomplete tasks
+    incomplete_tasks = []
+    for task in tasks:
+        if task.get("status") == "completed":
+            completed.append(task)
+        else:
+            incomplete_tasks.append(task)
+    
+    tasks = incomplete_tasks
+    
     # Return the events and tasks for the day
     return {
         "events": events,
-        "tasks": tasks
+        "tasks": tasks,
+        "completed": completed
     }

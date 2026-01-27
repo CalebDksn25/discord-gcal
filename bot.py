@@ -52,12 +52,13 @@ async def help_command(interaction: discord.Interaction):
         "/ping - Check if the bot is active.\n"
         "/help - Get help and list of the commands.\n"
         "/add <text> - Add a new event or task to google calendar.\n"
+        "/list - List today's events and tasks.\n"
         # Add more commands here as needed
     )
     await interaction.response.send_message(help_text, ephemeral=True)
 
 # Define the /list command that will list upcoming events and tasks
-@client.tree.command(name="list", description="List upcoming events and tasks")
+@client.tree.command(name="list", description="List today's events and tasks")
 async def list_items(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True, ephemeral=True)
 

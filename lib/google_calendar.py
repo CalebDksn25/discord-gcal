@@ -1,4 +1,5 @@
 from googleapiclient.discovery import build
+from datetime import datetime, timedelta
 
 """
 Function to create an event in the google calendar from the item dictionary.
@@ -47,3 +48,44 @@ def create_task(creds, item: dict, tasklist_id: str = "@default") -> str:
 
     # Return the task ID
     return created.get('id')
+
+"""
+Function to list all of the current task and events on the users calendar for current day.
+"""
+
+def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@default") -> dict:
+    # Build the Google Calendar and Tasks services
+    service = build("calendar", "v3", credentials=creds)
+    tasks_service = build("tasks", "v1", credentials=creds)
+
+    # Define the time range for today
+    date = datetime.utcnow().date()
+    start_of_day = datetime.combine(date, datetime.min.time()).isoformat() + 'Z'  # 'Z' indicates UTC time
+    end_of_day = datetime.combine(date, datetime.max.time()).isoformat() + 'Z'
+
+    # Fetch today's events from Google Calendar
+    events_result = service.events().list(
+        calendarId=calendar_id,
+        timeMin=start_of_day,
+        timeMax=end_of_day,
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+
+    events = events_result.get('items', [])
+
+    # Fetch today's tasks from Google Tasks
+    tasks_result = tasks_service.tasks().list(
+        tasklist=tasklist_id,
+        showCompleted=True,
+        dueMax=end_of_day,
+        dueMin=start_of_day
+    ).execute()
+
+    tasks = tasks_result.get('items', [])
+    
+    # Return the events and tasks for the day
+    return {
+        "events": events,
+        "tasks": tasks
+    }

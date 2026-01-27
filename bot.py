@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed
 from lib.openai_client import get_openai_response
-from lib.google_calendar import create_calendar_event, create_task
+from lib.google_calendar import create_calendar_event, create_task, list_today_items
 from lib.google_auth import get_creds
 
 # Load the environmental variables from .env file
@@ -55,6 +55,35 @@ async def help_command(interaction: discord.Interaction):
     )
     await interaction.response.send_message(help_text, ephemeral=True)
 
+# Define the /list command that will list upcoming events and tasks
+@client.tree.command(name="list", description="List upcoming events and tasks")
+async def list_items(interaction: discord.Interaction):
+    await interaction.response.defer(thinking=True, ephemeral=True)
+
+    # Get the google API credentials
+    creds = get_creds()
+
+    # List today's items
+    items = list_today_items(creds)
+
+    if not items["events"] and not items["tasks"]:
+        await interaction.followup.send("No events or tasks found for today.", ephemeral=True)
+        return
+    response_lines = ["**Today's Events and Tasks:**"]
+    if items["events"]:
+        response_lines.append("\n**Events:**")
+        for event in items["events"]:
+            start = event.get("start").get("dateTime", event.get("start").get("date"))
+            response_lines.append(f"- {event.get('summary')} at {start}")
+    if items["tasks"]:
+        response_lines.append("\n**Tasks:**")
+        for task in items["tasks"]:
+            due = task.get("due", "No due date")
+            response_lines.append(f"- {task.get('title')} (Due: {due})")
+
+    await interaction.followup.send("\n".join(response_lines), ephemeral=True)
+    
+
 # Define the /add command 
 @client.tree.command(name="add", description="Add a new event or task using NLP")
 @app_commands.describe(text="What do you want to add?")
@@ -83,7 +112,7 @@ async def add(interaction: discord.Interaction, text: str):
 
             # Create the appropriate item
             link = create_calendar_event(creds, item_dict)
-            
+
         else:
             # Assume its a task
             task_id = create_task(creds, item_dict)

@@ -34,6 +34,17 @@ client = MyClient()
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("Pong! Bot is active.", ephemeral=True)
 
+# Define the slash help command
+@client.tree.command(name="help", description="Get help and list of the commands")
+async def help_command(interaction: discord.Interaction):
+    help_text = (
+        "**Available Commands:**\n"
+        "/ping - Check if the bot is active.\n"
+        "/help - Get help and list of the commands.\n"
+        # Add more commands here as needed
+    )
+    await interaction.response.send_message(help_text, ephemeral=True)
+
 
 # Ensure we have a token before running the bot
 if not TOKEN:

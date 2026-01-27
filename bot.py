@@ -4,6 +4,7 @@ from discord import app_commands
 from dotenv import load_dotenv
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView
+from lib.openai_client import get_openai_response
 
 # Load the environmental variables from .env file
 load_dotenv()
@@ -58,6 +59,9 @@ async def add(interaction: discord.Interaction, text: str):
     # Placeholder for NLP processing logic
     item = parse_text(text)
     PENDING[interaction.user.id] = item
+    
+    # Acknowledge quickly to avoid interaction timeout
+    await interaction.response.defer(thinking=True, ephemeral=True)
 
     async def on_confirm(interaction2: discord.Interaction):
         item2 = PENDING.pop(interaction2.user.id, None)
@@ -67,9 +71,13 @@ async def add(interaction: discord.Interaction, text: str):
         PENDING.pop(interaction2.user.id, None)
         await interaction2.response.send_message(f"Cancelled adding item.", ephemeral=True)
 
-    await interaction.response.send_message(
-        f"Preview:\nType: {item.kind}\nTitle: {item.title}\nWhen: {item.when}\nLocation: {item.location}\n\nConfirm adding this item?",
-        view = ConfirmView(interaction.user.id, on_confirm, on_cancel), ephemeral=True
+    # Call OpenAI asynchronously to parse the text
+    openai_response = await get_openai_response(text)
+
+    await interaction.followup.send(
+        f"Preview:\n{openai_response}\n\nDo you want to confirm adding this item?",
+        view=ConfirmView(interaction.user.id, on_confirm, on_cancel),
+        ephemeral=True
     )
 
 # Ensure we have a token before running the bot

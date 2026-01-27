@@ -1,9 +1,10 @@
 import os
+import json
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
 from lib.parser import parse_text, ParsedItem
-from lib.ui import ConfirmView
+from lib.ui import ConfirmView, build_preview_embed
 from lib.openai_client import get_openai_response
 
 # Load the environmental variables from .env file
@@ -74,8 +75,20 @@ async def add(interaction: discord.Interaction, text: str):
     # Call OpenAI asynchronously to parse the text
     openai_response = await get_openai_response(text)
 
+    try:
+        ai_payload = json.loads(openai_response)
+    except json.JSONDecodeError:
+        await interaction.followup.send(
+            "Sorry, I couldn't parse the AI response. Please try again.",
+            ephemeral=True,
+        )
+        return
+
+    # Build the embed structure
+    embed = build_preview_embed(ai_payload)
+
     await interaction.followup.send(
-        f"Preview:\n{openai_response}\n\nDo you want to confirm adding this item?",
+        embed=embed,
         view=ConfirmView(interaction.user.id, on_confirm, on_cancel),
         ephemeral=True
     )

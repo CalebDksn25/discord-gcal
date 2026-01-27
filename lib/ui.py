@@ -1,5 +1,6 @@
 import discord
 from typing import Callable, Optional, Awaitable
+from dateutil.parser import isoparse
 
 OnAction = Callable[[discord.Interaction], Awaitable[None]]
 
@@ -32,3 +33,48 @@ class ConfirmView(discord.ui.View):
         else:
             await interaction.response.send_message("❌ Cancelled.", ephemeral=True)
         self.stop()
+
+
+def build_preview_embed(item: dict) -> discord.Embed:
+    embed = discord.Embed(title="Preview")
+
+    item_type = item.get("type", "task")
+    title = (item.get("title") or "Untitled").strip().title()
+    location = item.get("location")
+    assumptions = item.get("assumptions") or []
+
+    embed.add_field(name="Type", value=item_type.capitalize(), inline=True)
+    embed.add_field(name="Title", value=title, inline=True)
+
+    if item_type == "event":
+        start_s = item.get("start_time")
+        end_s = item.get("end_time")
+        if start_s and end_s:
+            start = isoparse(start_s)
+            end = isoparse(end_s)
+            when_text = f"{start:%a %b %d, %I:%M %p} – {end:%I:%M %p}"
+        elif start_s:
+            start = isoparse(start_s)
+            when_text = f"{start:%a %b %d, %I:%M %p} (end time missing)"
+        else:
+            when_text = "⚠️ Could not determine time"
+        embed.add_field(name="When", value=when_text, inline=False)
+
+    if item_type == "task":
+        due = item.get("due_date")
+        embed.add_field(name="Due", value=due or "—", inline=False)
+
+    if location:
+        embed.add_field(name="Location", value=location, inline=False)
+
+    if assumptions:
+        # Keep it short for Discord
+        short = assumptions[:4]
+        embed.add_field(name="Assumptions", value="• " + "\n• ".join(short), inline=False)
+
+    notes = item.get("notes")
+    if notes:
+        embed.add_field(name="Notes", value=notes[:300], inline=False)
+
+    embed.set_footer(text="Confirm adding this item?")
+    return embed

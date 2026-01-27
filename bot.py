@@ -41,9 +41,17 @@ async def help_command(interaction: discord.Interaction):
         "**Available Commands:**\n"
         "/ping - Check if the bot is active.\n"
         "/help - Get help and list of the commands.\n"
+        "/add <text> - Add a new event or task to google calendar.\n"
         # Add more commands here as needed
     )
     await interaction.response.send_message(help_text, ephemeral=True)
+
+# Define the /add command 
+@client.tree.command(name="add", description="Add a new event or task using NLP")
+@app_commands.describe(text="What do you want to add?")
+async def add(interaction: discord.Interaction, text: str):
+    # Placeholder for NLP processing logic
+    await interaction.response.send_message(f"Recieved your request to add: {text}", ephemeral=True)
 
 
 # Ensure we have a token before running the bot

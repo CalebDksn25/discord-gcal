@@ -10,6 +10,7 @@ INTERPRETATION RULES:
 - Use the provided user timezone for interpretation.
 - Do NOT hallucinate missing information. If unknown/ambiguous, use null.
 - However, for EVENTS: if start_time is known and end_time is missing, you MUST set end_time using default_duration_minutes.
+- If no due date/time is specified for a task, assume that it is due today.
 - default_duration_minutes:
   - dinner/meal/restaurant = 120
   - meeting/appointment/interview = 60

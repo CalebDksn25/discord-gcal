@@ -143,16 +143,23 @@ async def add(interaction: discord.Interaction, text: str):
             # Create the appropriate item
             link = create_calendar_event(creds, item_dict)
             await interaction2.response.send_message(
-                f"Added Event: **{item_dict['title'].title()}**\n{link}",
+                f"✅ Added Event: **{item_dict['title'].title()}**\n{link}",
                 ephemeral=True
             )
 
-        elif item_dict["type"] == "tasks":
-            # Assume its a task
+        elif item_dict["type"] == "task":
+            # Create a task
             task_id = create_task(creds, item_dict)
             link = f"https://tasks.google.com/embed/list/@default/task/{task_id}"
             await interaction2.response.send_message(
                 f"Added task: **{item_dict['title'].title()}**\n{link}",
+                ephemeral=True
+            )
+        
+        else:
+            # Unknown type
+            await interaction2.response.send_message(
+                f"Unknown item type: {item_dict.get('type')}",
                 ephemeral=True
             )
     

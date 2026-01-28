@@ -12,6 +12,8 @@ from lib.openai_client import get_openai_response
 from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
+from lib.canvas_client import CanvasClient
+from lib.canvas_sync import sync_canvas_assignments_to_google_tasks
 
 # Load the environmental variables from .env file
 load_dotenv()
@@ -386,6 +388,53 @@ async def add(interaction: discord.Interaction, text: str):
         view=ConfirmView(interaction.user.id, on_confirm, on_cancel),
         ephemeral=True
     )
+
+# Define the /canvas_sync command
+@client.tree.command(name="canvas_sync", description="Sync Canvas assignments to Google Tasks")
+async def canvas_sync(interaction: discord.Interaction):
+    # Acknowledge quickly to avoid interaction timeout
+    await interaction.response.defer(thinking=True, ephemeral=True)
+
+    async def run_sync():
+        try:
+            # Get Canvas token from environment
+            canvas_token = os.getenv("CANVAS_TOKEN")
+            canvas_api_url = os.getenv("CANVAS_BASE_URL")
+            
+            if not canvas_token or not canvas_api_url:
+                return "Canvas API credentials not configured. Set CANVAS_TOKEN and CANVAS_BASE_URL in .env"
+            
+            # Initialize Canvas client
+            canvas_client = CanvasClient(canvas_api_url, canvas_token)
+            
+            # Get Google credentials
+            creds = get_creds()
+            
+            # Run the sync in executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            summary = await loop.run_in_executor(
+                None,
+                sync_canvas_assignments_to_google_tasks,
+                canvas_client,
+                creds
+            )
+            
+            # Format response
+            response = (
+                f"**Canvas Sync Complete**\n\n"
+                f"Created: {summary['created']}\n"
+                f"Updated: {summary['updated']}\n"
+                f"⏭Skipped: {summary['skipped']}\n"
+                f"Errors: {summary['errors']}"
+            )
+            return response
+        
+        except Exception as e:
+            return f"Sync failed: {str(e)}"
+
+    # Run sync and send result
+    result = await run_sync()
+    await interaction.followup.send(result, ephemeral=True)
 
 # Ensure we have a token before running the bot
 if not TOKEN:

@@ -127,30 +127,3 @@ def build_preview_embed(item: dict) -> discord.Embed:
 
     embed.set_footer(text="Confirm adding this item?")
     return embed
-
-def build_done_embed(item: dict) -> discord.Embed:
-    embed = discord.Embed(title="Item Added")
-
-    item_type = item.get("type", "task")
-    title = (item.get("title") or "Untitled").strip().title()
-
-    embed.add_field(name="Type", value=item_type.capitalize(), inline=True)
-    embed.add_field(name="Title", value=title, inline=True)
-
-    if item_type == "event":
-        start_s = item.get("start_time")
-        end_s = item.get("end_time")
-        if start_s and end_s:
-            start = isoparse(start_s)
-            end = isoparse(end_s)
-            when_text = f"{start:%a %b %d, %I:%M %p} – {end:%I:%M %p}"
-        else:
-            when_text = "⚠️ Could not determine time"
-        embed.add_field(name="When", value=when_text, inline=False)
-
-    if item_type == "task":
-        due = item.get("due_date")
-        embed.add_field(name="Due", value=due or "—", inline=False)
-
-    embed.set_footer(text="The item has been successfully added to your calendar/task list.")
-    return embed

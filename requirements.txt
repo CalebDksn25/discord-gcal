@@ -8,3 +8,4 @@ dateparser==1.2.2
 python-dateutil==2.9.0
 google-auth-httplib2==0.3.0
 rapidfuzz==3.14.3
+requests==2.32.5

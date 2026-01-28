@@ -171,7 +171,7 @@ def list_open_tasks(creds, tasklist_id: str = "@default", max_results: int = 100
 """
 Function to mark a task as complete by its ID. Returns TRUE if successful.
 """
-def delete_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
+def done_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
 
     try:
         # Build the Google Tasks service

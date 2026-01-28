@@ -9,7 +9,7 @@ from datetime import datetime
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed, SelectTaskView
 from lib.openai_client import get_openai_response
-from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, delete_task
+from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
 
@@ -166,11 +166,11 @@ async def done(interaction: discord.Interaction, item: str):
             )
             return
         
-        # Run delete_task in executor to avoid blocking
+        # Run done_task in executor to avoid blocking
         loop = asyncio.get_event_loop()
         try:
             # Use functools.partial to bind the creds argument
-            delete_func = functools.partial(delete_task, creds, task_id)
+            delete_func = functools.partial(done_task, creds, task_id)
             success = await loop.run_in_executor(None, delete_func)
         except Exception as e:
             await interaction2.response.send_message(
@@ -181,13 +181,13 @@ async def done(interaction: discord.Interaction, item: str):
 
         if not success:
             await interaction2.response.send_message(
-                f"❌ Failed to mark '{matched_task.get('title')}' as complete.",
+                f"Failed to mark '{matched_task.get('title')}' as complete.",
                 ephemeral=True
             )
             return
         
         await interaction2.response.send_message(
-            f"✅ Marked as complete: **{matched_task.get('title')}**",
+            f"Marked as complete: **{matched_task.get('title')}**",
             ephemeral=True
         )
     

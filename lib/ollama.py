@@ -1,10 +1,10 @@
 import asyncio
 import requests
 from typing import Dict, List
-from lib.prompts import OPENAI_SYSTEM_PROMPT, OPENAI_USER_PROMPT
+from .prompts import OPENAI_SYSTEM_PROMPT, get_user_prompt
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "llama2"  # Change to your preferred model (e.g., "neural-chat", "mistral")
+MODEL = "llama3.1:8b"  # Change to your preferred model
 
 class LLMError(Exception):
     """Raise this error for LLM related issues."""
@@ -16,7 +16,7 @@ def _generate_response_sync(messages: List[Dict[str, str]]) -> str:
     payload = {
         "model": MODEL,
         "messages": messages,
-        "stream": False, 
+        "stream": False,
     }
 
     try:
@@ -45,10 +45,10 @@ async def get_ollama_response(user_input: str) -> str:
     Get a response from Ollama using the same prompts as OpenAI.
     Runs the blocking request in an executor to avoid blocking the event loop.
     """
-    # Prepare the user prompt by inserting the user input
-    user_prompt = OPENAI_USER_PROMPT.replace("{{USER_INPUT}}", user_input)
+    # Prepare the user prompt with current LA date
+    user_prompt = get_user_prompt(user_input)
 
-    # Build the messages in OpenAI format
+    # Build messages in OpenAI format (Ollama chat API uses same format)
     messages = [
         {"role": "system", "content": OPENAI_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt}

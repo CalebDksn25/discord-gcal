@@ -9,6 +9,7 @@ from datetime import datetime
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed, SelectTaskView
 from lib.openai_client import get_openai_response
+from lib.ollama import get_ollama_response
 from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
@@ -197,11 +198,12 @@ async def delete(interaction: discord.Interaction, item: str):
         PENDING.pop(interaction2.user.id, None)
         await interaction2.response.send_message(f"Cancelled.", ephemeral=True)
 
-    # Build preview text showing all matches
+    # Build preview text showing all matches (limit to top 5)
     emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+    top_matches = matches[:5]  # Only show top 5 matches
     preview_lines = [f"**Found {len(matches)} match(es) for '{item}':**\n"]
     
-    for idx, (item_idx, score) in enumerate(matches):
+    for idx, (item_idx, score) in enumerate(top_matches):
         task = items[item_idx]
         preview_lines.append(f"{emojis[idx]} **{task.get('title')}** (Match: {score:.0f}%)")
     
@@ -294,11 +296,12 @@ async def done(interaction: discord.Interaction, item: str):
         PENDING.pop(interaction2.user.id, None)
         await interaction2.response.send_message(f"Cancelled.", ephemeral=True)
 
-    # Build preview text showing all matches
+    # Build preview text showing all matches (limit to top 5)
     emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+    top_matches = matches[:5]  # Only show top 5 matches
     preview_lines = [f"**Found {len(matches)} match(es) for '{item}':**\n"]
     
-    for idx, (item_idx, score) in enumerate(matches):
+    for idx, (item_idx, score) in enumerate(top_matches):
         task = items[item_idx]
         preview_lines.append(f"{emojis[idx]} **{task.get('title')}** (Match: {score:.0f}%)")
     
@@ -366,7 +369,7 @@ async def add(interaction: discord.Interaction, text: str):
         await interaction2.response.send_message(f"Cancelled adding item.", ephemeral=True)
 
     # Call OpenAI asynchronously to parse the text
-    openai_response = await get_openai_response(text)
+    openai_response = await get_ollama_response(text)
 
     try:
         ai_payload = json.loads(openai_response)

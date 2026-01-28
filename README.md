@@ -21,13 +21,21 @@ uv venv
 source .venv/bin/activate
 ```
 
-### **3- Set up OLLAMA model running locally**
+### **3- Download all dependencies**
 
 ```
-# Install Ollama from https://ollama.ai
-# Then run:
-ollama serve
+uv pip install -r requirements.txt
+```
 
-# In another terminal, pull a model:
-ollama pull llama2  # or neural-chat, mistral, etc.
+### **4- Set up OLLAMA model running locally**
+
+```
+ollama serve
+```
+
+### **5- Start the discord bot**
+
+```
+source .venv/bin/activate
+python bot.py
 ```

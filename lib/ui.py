@@ -1,8 +1,57 @@
 import discord
-from typing import Callable, Optional, Awaitable
+from typing import Callable, Optional, Awaitable, List, Tuple
 from dateutil.parser import isoparse
 
 OnAction = Callable[[discord.Interaction], Awaitable[None]]
+
+class SelectTaskView(discord.ui.View):
+    """View with numbered emoji buttons for selecting which task to mark complete"""
+    def __init__(self, user_id: int, matches: List[Tuple[int, float]], items: list, on_select: Callable[[discord.Interaction, int], Awaitable[None]], on_cancel: Optional[OnAction] = None):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.matches = matches
+        self.items = items
+        self.on_select = on_select
+        self.on_cancel = on_cancel
+        
+        # Emoji numbers for buttons
+        emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+        
+        # Add numbered buttons for each match
+        for idx, (item_idx, score) in enumerate(matches[:5]):  # Max 5 buttons
+            task = items[item_idx]
+            button = discord.ui.Button(
+                emoji=emojis[idx],
+                style=discord.ButtonStyle.primary,
+                custom_id=f"select_{idx}"
+            )
+            
+            async def button_callback(interaction: discord.Interaction, selected_idx=idx):
+                await self.on_select(interaction, selected_idx)
+                self.stop()
+            
+            button.callback = button_callback
+            self.add_item(button)
+        
+        # Add cancel button
+        cancel_button = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.danger)
+        async def cancel_callback(interaction: discord.Interaction):
+            if self.on_cancel:
+                await self.on_cancel(interaction)
+            else:
+                await interaction.response.send_message("❌ Cancelled.", ephemeral=True)
+            self.stop()
+        cancel_button.callback = cancel_callback
+        self.add_item(cancel_button)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This selection isn't for you.",
+                ephemeral=True
+            )
+            return False
+        return True
 
 class ConfirmView(discord.ui.View):
     def __init__(self, user_id: int, on_confirm: OnAction, on_cancel: Optional[OnAction] = None):

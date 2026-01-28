@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 import os
-from lib.prompts import OPENAI_USER_PROMPT, OPENAI_SYSTEM_PROMPT
+from lib.prompts import get_user_prompt, OPENAI_SYSTEM_PROMPT
 
 
 # Load environment variables from .env file
@@ -12,8 +12,8 @@ client = AsyncOpenAI()
 
 # Create a function to get response from OpenAI asynchronously
 async def get_openai_response(user_input: str):
-    # Prepare the user prompt by inserting the user input
-    user_prompt = OPENAI_USER_PROMPT.replace("{{USER_INPUT}}", user_input)
+    # Prepare the user prompt with current LA date
+    user_prompt = get_user_prompt(user_input)
 
     # Call the OpenAI API asynchronously
     response = await client.chat.completions.create(

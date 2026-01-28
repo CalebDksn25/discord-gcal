@@ -132,3 +132,87 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
         "tasks": tasks,
         "completed": completed
     }
+
+
+"""
+Function to return open (not completed) tasks from the given task list.
+Each item includes id/title/due/notes/updated (when available).
+"""
+def list_open_tasks(creds, tasklist_id: str = "@default", max_results: int = 100) -> list[dict]:
+
+    # Build the google tasks service
+    service = build("tasks", "v1", credentials=creds)
+
+    # Get the response from the tasks list API
+    response = service.tasks().list(
+        tasklist=tasklist_id,
+        showCompleted=False,
+        showHidden=False,
+        maxResults=max_results
+    ).execute()
+
+    # List of the items returned
+    items = response.get("items", [])
+
+    # Normalize to have consistent structure
+    tasks = []
+    for item in items:
+        tasks.append({
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "due": item.get("due"),
+            "notes": item.get("notes"),
+            "updated": item.get("updated"),
+        })
+
+    # Return the list of open tasks
+    return tasks
+
+"""
+Function to delete a task by its ID. Returns TRUE if successful.
+"""
+def delete_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
+    try:
+        # Build the google task service
+        service = build("tasks", "v1", credentials=creds)
+
+        # Delete the task
+        service.tasks().delete(
+            tasklist=tasklist_id,
+            task=task_id
+        ).execute()
+
+        return True
+
+    except Exception as e:
+        print(f"Error building Google Tasks service: {e}")
+        raise e
+
+"""
+Function to mark a task as complete by its ID. Returns TRUE if successful.
+"""
+def done_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
+
+    try:
+        # Build the Google Tasks service
+        service = build("tasks", "v1", credentials=creds)
+
+        # First, get the task to ensure it exists and get its full data
+        task = service.tasks().get(
+            tasklist=tasklist_id,
+            task=task_id
+        ).execute()
+
+        # Update the task with completed status
+        task["status"] = "completed"
+        service.tasks().update(
+            tasklist=tasklist_id,
+            task=task_id,
+            body=task
+        ).execute()
+
+        return True
+
+    except Exception as e:
+        print(f"Error marking task {task_id} as complete: {e}")
+        raise e

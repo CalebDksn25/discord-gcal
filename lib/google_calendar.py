@@ -1,5 +1,6 @@
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 """
 Function to create an event in the google calendar from the item dictionary.
@@ -62,10 +63,12 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
     service = build("calendar", "v3", credentials=creds)
     tasks_service = build("tasks", "v1", credentials=creds)
 
-    # Define the time range for today
-    date = datetime.utcnow().date()
-    start_of_day = datetime.combine(date, datetime.min.time()).isoformat() + 'Z'  # 'Z' indicates UTC time
-    end_of_day = datetime.combine(date, datetime.max.time()).isoformat() + 'Z'
+    # Define the time range for today using Pacific timezone
+    pacific = ZoneInfo("America/Los_Angeles")
+    now_pacific = datetime.now(pacific)
+    date = now_pacific.date()
+    start_of_day = datetime.combine(date, datetime.min.time(), tzinfo=pacific).astimezone(ZoneInfo("UTC")).isoformat().replace('+00:00', 'Z')
+    end_of_day = datetime.combine(date, datetime.max.time(), tzinfo=pacific).astimezone(ZoneInfo("UTC")).isoformat().replace('+00:00', 'Z')
 
     # Fetch today's events from Google Calendar
     events_result = service.events().list(
@@ -79,19 +82,39 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
     events = events_result.get('items', [])
 
     # Fetch today's tasks from Google Tasks
-    # Note: Google Tasks uses date-only format for 'due' field, so we need to use date strings
-    # dueMin is inclusive, dueMax is exclusive, so we need to set dueMax to tomorrow
     tomorrow = date + timedelta(days=1)
+    
+    # Fetch all tasks (completed and hidden included)
     tasks_result = tasks_service.tasks().list(
         tasklist=tasklist_id,
         showCompleted=True,
-        showHidden=True,
-        dueMax=tomorrow.isoformat() + 'T00:00:00Z',  # Up to (but not including) tomorrow
-        dueMin=start_of_day  # From start of today
+        showHidden=True
     ).execute()
 
     tasks = tasks_result.get('items', [])
-    print("Fetched tasks:", len(tasks), "items")
+    
+    # Separate completed and incomplete tasks, filtering by today's date
+    incomplete_tasks = []
+    for task in tasks:
+        # Check if task is due today
+        task_due = task.get('due')
+        is_today = False
+        if task_due:
+            try:
+                # Parse the due date and check if it's today
+                task_date = datetime.fromisoformat(task_due.replace('Z', '+00:00')).date()
+                is_today = task_date == date
+            except:
+                pass
+        
+        # Only include tasks due today
+        if is_today:
+            if task.get("status") == "completed":
+                completed.append(task)
+            else:
+                incomplete_tasks.append(task)
+    
+    tasks = incomplete_tasks
     
     # Separate completed and incomplete tasks
     incomplete_tasks = []

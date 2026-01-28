@@ -5,10 +5,11 @@ from discord import app_commands
 from dotenv import load_dotenv
 from datetime import datetime
 from lib.parser import parse_text, ParsedItem
-from lib.ui import ConfirmView, build_preview_embed
+from lib.ui import ConfirmView, build_preview_embed, build_done_embed, SelectTaskView
 from lib.openai_client import get_openai_response
-from lib.google_calendar import create_calendar_event, create_task, list_today_items
+from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks
 from lib.google_auth import get_creds
+from lib.fuzz_match import get_best_match
 
 # Load the environmental variables from .env file
 load_dotenv()
@@ -112,6 +113,78 @@ async def list_items(interaction: discord.Interaction):
 
     await interaction.followup.send("\n".join(response_lines), ephemeral=True)
 
+# Define the /done command that will mark tasks or events as completed
+@client.tree.command(name="done", description="Mark an item as completed")
+@app_commands.describe(item="What is the name of the item to mark as done?")
+async def done(interaction: discord.Interaction, item: str):
+    # Acknowledge quickly to avoid interaction timeout
+    await interaction.response.defer(thinking=True, ephemeral=True)
+
+    # Get Google API credentials
+    creds = get_creds()
+
+    # List items to find one to mark as completed
+    items = list_open_tasks(creds)
+
+    # Find the best matching item to query
+    matches = get_best_match(item, items)
+    # RETURNS: [(index, score), ...] EX-> [(2, 68.42), (4, 55.55)]
+
+    # If no matches found, inform the user
+    if not matches:
+        await interaction.followup.send(
+            f"No matching item found for '{item}'.",
+            ephemeral=True
+        )
+        return
+    
+    # Store in pending for confirmation
+    PENDING[interaction.user.id] = {
+        "original_query": item,
+        "matches": matches,
+        "items": items
+    }
+
+    async def on_select(interaction2: discord.Interaction, selected_idx: int):
+        # Get the pending item
+        item_dict = PENDING.pop(interaction2.user.id, None)
+
+        # If there is no pending item, inform the user
+        if not item_dict:
+            await interaction2.response.send_message("No pending item found.", ephemeral=True)
+            return
+
+        # Get the selected task
+        match_idx = item_dict["matches"][selected_idx][0]
+        matched_task = item_dict["items"][match_idx]
+        
+        # TODO: Actually mark the item as complete in Google Calendar/Tasks
+        
+        await interaction2.response.send_message(
+            f"Marked as complete: **{matched_task.get('title')}**",
+            ephemeral=True
+        )
+    
+    async def on_cancel(interaction2: discord.Interaction):
+        PENDING.pop(interaction2.user.id, None)
+        await interaction2.response.send_message(f"Cancelled.", ephemeral=True)
+
+    # Build preview text showing all matches
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+    preview_lines = [f"**Found {len(matches)} match(es) for '{item}':**\n"]
+    
+    for idx, (item_idx, score) in enumerate(matches):
+        task = items[item_idx]
+        preview_lines.append(f"{emojis[idx]} **{task.get('title')}** (Match: {score:.0f}%)")
+    
+    preview_lines.append("\n**Select the item to mark as complete:**")
+    preview_text = "\n".join(preview_lines)
+
+    await interaction.followup.send(
+        preview_text,
+        view=SelectTaskView(interaction.user.id, matches, items, on_select, on_cancel),
+        ephemeral=True
+    )
 
 # Define the /add command 
 @client.tree.command(name="add", description="Add a new event or task using NLP")
@@ -143,7 +216,7 @@ async def add(interaction: discord.Interaction, text: str):
             # Create the appropriate item
             link = create_calendar_event(creds, item_dict)
             await interaction2.response.send_message(
-                f"✅ Added Event: **{item_dict['title'].title()}**\n{link}",
+                f"Added Event: **{item_dict['title'].title()}**\n{link}",
                 ephemeral=True
             )
 

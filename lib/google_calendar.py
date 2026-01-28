@@ -132,3 +132,38 @@ def list_today_items(creds, calendar_id: str = "primary", tasklist_id: str = "@d
         "tasks": tasks,
         "completed": completed
     }
+
+
+"""
+Function to return open (not completed) tasks from the given task list.
+Each item includes id/title/due/notes/updated (when available).
+"""
+def list_open_tasks(creds, tasklist_id: str = "@default", max_results: int = 100) -> list[dict]:
+
+    # Build the google tasks service
+    service = build("tasks", "v1", credentials=creds)
+
+    # Get the response from the tasks list API
+    response = service.tasks().list(
+        tasklist=tasklist_id,
+        showCompleted=False,
+        showHidden=False,
+        maxResults=max_results
+    ).execute()
+
+    # List of the items returned
+    items = response.get("items", [])
+
+    # Normalize to have consistent structure
+    tasks = []
+    for item in items:
+        tasks.append({
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "due": item.get("due"),
+            "notes": item.get("notes"),
+            "updated": item.get("updated"),
+        })
+
+    # Return the list of open tasks
+    return tasks

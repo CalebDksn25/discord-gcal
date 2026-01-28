@@ -8,8 +8,13 @@ from dotenv import load_dotenv
 from datetime import datetime
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed, SelectTaskView
+
+# Choose between OpenAI and Ollama
+# View line 381 to switch from OpenAI to Ollama
 from lib.openai_client import get_openai_response
 from lib.ollama import get_ollama_response
+
+
 from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
@@ -21,7 +26,7 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 # Server ID (Right click on server -> Copy ID)
-GUILD_ID = 1465479190697611329
+GUILD_ID = 000000000000000  # Replace with your server ID
 
 # Add small pending items storage
 PENDING = {}
@@ -59,6 +64,9 @@ async def help_command(interaction: discord.Interaction):
         "/help - Get help and list of the commands.\n"
         "/add <text> - Add a new event or task to google calendar.\n"
         "/list - List today's events and tasks.\n"
+        "/done <item> - Mark an item as completed.\n"
+        "/delete <item> - Delete an item.\n"
+        "/canvas_sync - Sync Canvas assignments to Google Tasks.\n"
         # Add more commands here as needed
     )
     await interaction.response.send_message(help_text, ephemeral=True)
@@ -369,7 +377,8 @@ async def add(interaction: discord.Interaction, text: str):
         await interaction2.response.send_message(f"Cancelled adding item.", ephemeral=True)
 
     # Call OpenAI asynchronously to parse the text
-    openai_response = await get_ollama_response(text)
+    # THIS IS WHERE YOU WOULD PUT `get_ollama_response` IF YOU WANT TO USE OLLAMA INSTEAD
+    openai_response = await get_openai_response(text)
 
     try:
         ai_payload = json.loads(openai_response)

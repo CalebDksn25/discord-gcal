@@ -167,3 +167,32 @@ def list_open_tasks(creds, tasklist_id: str = "@default", max_results: int = 100
 
     # Return the list of open tasks
     return tasks
+
+"""
+Function to mark a task as complete by its ID. Returns TRUE if successful.
+"""
+def delete_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
+
+    try:
+        # Build the Google Tasks service
+        service = build("tasks", "v1", credentials=creds)
+
+        # First, get the task to ensure it exists and get its full data
+        task = service.tasks().get(
+            tasklist=tasklist_id,
+            task=task_id
+        ).execute()
+
+        # Update the task with completed status
+        task["status"] = "completed"
+        service.tasks().update(
+            tasklist=tasklist_id,
+            task=task_id,
+            body=task
+        ).execute()
+
+        return True
+
+    except Exception as e:
+        print(f"Error marking task {task_id} as complete: {e}")
+        raise e

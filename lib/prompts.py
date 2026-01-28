@@ -27,16 +27,24 @@ CLASSIFICATION RULES:
 
 You are not allowed to ask questions."""
 
-OPENAI_USER_PROMPT = """Parse the following text into structured data.
+def get_user_prompt(user_input: str) -> str:
+    """Generate user prompt with current LA date."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    
+    pacific = ZoneInfo("America/Los_Angeles")
+    current_date = datetime.now(pacific).strftime("%Y-%m-%d")
+    
+    return f"""Parse the following text into structured data.
 
-Text: "{{USER_INPUT}}"
+Text: "{user_input}"
 
 User timezone: America/Los_Angeles
-Current date (local): 2026-01-27
+Current date (local): {current_date}
 
 Return JSON using EXACTLY this schema (include every key, no extras):
 
-{
+{{
   "type": "event" | "task",
   "title": string,
   "start_time": string | null,
@@ -45,7 +53,7 @@ Return JSON using EXACTLY this schema (include every key, no extras):
   "location": string | null,
   "notes": string | null,
   "assumptions": string[]
-}
+}}
 
 Extra requirements:
 - If type="event" and start_time is not null, end_time must not be null (use defaults).

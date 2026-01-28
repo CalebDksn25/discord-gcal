@@ -1,13 +1,15 @@
 import os
 import json
+import asyncio
+import functools
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
 from datetime import datetime
 from lib.parser import parse_text, ParsedItem
-from lib.ui import ConfirmView, build_preview_embed, build_done_embed, SelectTaskView
+from lib.ui import ConfirmView, build_preview_embed, SelectTaskView
 from lib.openai_client import get_openai_response
-from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks
+from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, delete_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
 
@@ -117,17 +119,14 @@ async def list_items(interaction: discord.Interaction):
 @client.tree.command(name="done", description="Mark an item as completed")
 @app_commands.describe(item="What is the name of the item to mark as done?")
 async def done(interaction: discord.Interaction, item: str):
-    # Acknowledge quickly to avoid interaction timeout
+    # Acknowledge quickly to avoid interaction timeout - MUST be first thing
     await interaction.response.defer(thinking=True, ephemeral=True)
 
-    # Get Google API credentials
-    creds = get_creds()
-
-    # List items to find one to mark as completed
-    items = list_open_tasks(creds)
-
-    # Find the best matching item to query
-    matches = get_best_match(item, items)
+    # Run all blocking operations in a thread pool
+    loop = asyncio.get_event_loop()
+    creds = await loop.run_in_executor(None, get_creds)
+    items = await loop.run_in_executor(None, list_open_tasks, creds)
+    matches = await loop.run_in_executor(None, get_best_match, item, items)
     # RETURNS: [(index, score), ...] EX-> [(2, 68.42), (4, 55.55)]
 
     # If no matches found, inform the user
@@ -158,10 +157,37 @@ async def done(interaction: discord.Interaction, item: str):
         match_idx = item_dict["matches"][selected_idx][0]
         matched_task = item_dict["items"][match_idx]
         
-        # TODO: Actually mark the item as complete in Google Calendar/Tasks
+        # Verify task has an ID
+        task_id = matched_task.get("id")
+        if not task_id:
+            await interaction2.response.send_message(
+                f" Error: Task '{matched_task.get('title')}' has no ID. Cannot mark as complete.",
+                ephemeral=True
+            )
+            return
+        
+        # Run delete_task in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        try:
+            # Use functools.partial to bind the creds argument
+            delete_func = functools.partial(delete_task, creds, task_id)
+            success = await loop.run_in_executor(None, delete_func)
+        except Exception as e:
+            await interaction2.response.send_message(
+                f"Error marking task as complete: {str(e)}",
+                ephemeral=True
+            )
+            return
+
+        if not success:
+            await interaction2.response.send_message(
+                f"❌ Failed to mark '{matched_task.get('title')}' as complete.",
+                ephemeral=True
+            )
+            return
         
         await interaction2.response.send_message(
-            f"Marked as complete: **{matched_task.get('title')}**",
+            f"✅ Marked as complete: **{matched_task.get('title')}**",
             ephemeral=True
         )
     

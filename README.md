@@ -20,3 +20,14 @@ uv --version
 uv venv
 source .venv/bin/activate
 ```
+
+### **3- Set up OLLAMA model running locally**
+
+```
+# Install Ollama from https://ollama.ai
+# Then run:
+ollama serve
+
+# In another terminal, pull a model:
+ollama pull llama2  # or neural-chat, mistral, etc.
+```

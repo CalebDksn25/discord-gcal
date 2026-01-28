@@ -169,6 +169,26 @@ def list_open_tasks(creds, tasklist_id: str = "@default", max_results: int = 100
     return tasks
 
 """
+Function to delete a task by its ID. Returns TRUE if successful.
+"""
+def delete_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:
+    try:
+        # Build the google task service
+        service = build("tasks", "v1", credentials=creds)
+
+        # Delete the task
+        service.tasks().delete(
+            tasklist=tasklist_id,
+            task=task_id
+        ).execute()
+
+        return True
+
+    except Exception as e:
+        print(f"Error building Google Tasks service: {e}")
+        raise e
+
+"""
 Function to mark a task as complete by its ID. Returns TRUE if successful.
 """
 def done_task(creds, task_id: str, tasklist_id: str = "@default") -> bool:

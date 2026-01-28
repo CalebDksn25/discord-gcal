@@ -9,7 +9,7 @@ from datetime import datetime
 from lib.parser import parse_text, ParsedItem
 from lib.ui import ConfirmView, build_preview_embed, SelectTaskView
 from lib.openai_client import get_openai_response
-from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task
+from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
 
@@ -114,6 +114,103 @@ async def list_items(interaction: discord.Interaction):
         response_lines.append("\nNo completed items for today.")
 
     await interaction.followup.send("\n".join(response_lines), ephemeral=True)
+
+# Define the /delete command that will delete a task or event as completed
+@client.tree.command(name="delete", description="Delete an item")
+@app_commands.describe(item="What is the name of the item to delete?")
+async def delete(interaction: discord.Interaction, item: str):
+    # Acknowledge quickly to avoid interaction timeout
+    await interaction.response.defer(thinking=True, ephemeral=True)
+
+    # Run all blocking operations in a thread pool
+    loop = asyncio.get_event_loop()
+    creds = await loop.run_in_executor(None, get_creds)
+    items = await loop.run_in_executor(None, list_open_tasks, creds)
+    matches = await loop.run_in_executor(None, get_best_match, item, items)
+    # RETURNS: [(index, score), ...] EX-> [(2, 68.42), (4, 55.55)]
+
+    # If no matches found, inform the user
+    if not matches:
+        await interaction.followup.send(
+            f"No matching item found for '{item}'.",
+            ephemeral=True
+        )
+        return
+    
+    # Store in pending for confirmation
+    PENDING[interaction.user.id] = {
+        "original_query": item,
+        "matches": matches,
+        "items": items
+    }
+
+    async def on_select(interaction2: discord.Interaction, selected_idx: int):
+        # Get the pending item
+        item_dict = PENDING.pop(interaction2.user.id, None)
+
+        # If there is no pending item, inform the user
+        if not item_dict:
+            await interaction2.response.send_message("No pending item found.", ephemeral=True)
+            return
+
+        # Get the selected task
+        match_idx = item_dict["matches"][selected_idx][0]
+        matched_task = item_dict["items"][match_idx]
+        
+        # Verify task has an ID
+        task_id = matched_task.get("id")
+        if not task_id:
+            await interaction2.response.send_message(
+                f" Error: Task '{matched_task.get('title')}' has no ID. Cannot delete.",
+                ephemeral=True
+            )
+            return
+        
+        # Run delete_task in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        try:
+            # Use functools.partial to bind the creds argument
+            delete_func = functools.partial(delete_task, creds, task_id)
+            success = await loop.run_in_executor(None, delete_func)
+        except Exception as e:
+            await interaction2.response.send_message(
+                f"Error deleting task: {str(e)}",
+                ephemeral=True
+            )
+            return
+
+        if not success:
+            await interaction2.response.send_message(
+                f"Failed to delete '{matched_task.get('title')}'.",
+                ephemeral=True
+            )
+            return
+        
+        await interaction2.response.send_message(
+            f"Deleted: **{matched_task.get('title')}**",
+            ephemeral=True
+        )
+    
+    async def on_cancel(interaction2: discord.Interaction):
+        PENDING.pop(interaction2.user.id, None)
+        await interaction2.response.send_message(f"Cancelled.", ephemeral=True)
+
+    # Build preview text showing all matches
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+    preview_lines = [f"**Found {len(matches)} match(es) for '{item}':**\n"]
+    
+    for idx, (item_idx, score) in enumerate(matches):
+        task = items[item_idx]
+        preview_lines.append(f"{emojis[idx]} **{task.get('title')}** (Match: {score:.0f}%)")
+    
+    preview_lines.append("\n**Select the item to delete:**")
+    preview_text = "\n".join(preview_lines)
+
+    await interaction.followup.send(
+        preview_text,
+        view=SelectTaskView(interaction.user.id, matches, items, on_select, on_cancel),
+        ephemeral=True
+    )
 
 # Define the /done command that will mark tasks or events as completed
 @client.tree.command(name="done", description="Mark an item as completed")

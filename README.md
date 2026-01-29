@@ -86,7 +86,7 @@ CANVAS_TOKEN="your_canvas_token_here"
 
 ## Demo Video:
 
-![Demo](assets/demo.gif)
+![Demo](assets/calendar_example.gif)
 
 ## Getting Data To Run:
 

@@ -15,7 +15,7 @@ from lib.openai_client import get_openai_response
 from lib.ollama import get_ollama_response
 
 
-from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task
+from lib.google_calendar import create_calendar_event, create_task, list_today_items, list_open_tasks, done_task, delete_task, get_list
 from lib.google_auth import get_creds
 from lib.fuzz_match import get_best_match
 from lib.canvas_client import CanvasClient
@@ -73,19 +73,21 @@ async def help_command(interaction: discord.Interaction):
 
 # Define the /list command that will list upcoming events and tasks
 @client.tree.command(name="list", description="List today's events and tasks")
-async def list_items(interaction: discord.Interaction):
+@app_commands.describe(day="Which day to list items for? (Default: today)")
+async def list_items(interaction: discord.Interaction, day: str = None):
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     # Get the google API credentials
     creds = get_creds()
 
     # List today's items
-    items = list_today_items(creds)
+    items = get_list(creds, day)
+    # Will return dict with keys: "events", "tasks", "completed"
 
     if not items["events"] and not items["tasks"] and not items["completed"]:
         await interaction.followup.send("No events or tasks found for today.", ephemeral=True)
         return
-    response_lines = ["**Today's Events and Tasks:**"]
+    response_lines = [f"**Events and Tasks for {day if day else 'today'}:**"]
     if items["events"]:
         response_lines.append("\n**Events:**")
         for event in items["events"]:

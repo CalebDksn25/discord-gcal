@@ -1,6 +1,7 @@
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from openai_client import get_date_response
 
 """
 Function to create an event in the google calendar from the item dictionary.
@@ -49,6 +50,143 @@ def create_task(creds, item: dict, tasklist_id: str = "@default") -> str:
 
     # Return the task ID
     return created.get('id')
+
+def sort_completed_tasks(tasks: list[dict], date) -> list[dict]:
+    """Sort tasks by completion date, most recent first."""
+   # Separate completed and incomplete tasks, filtering by today's date
+    completed = []
+    incomplete_tasks = []
+    for task in tasks:
+        # Check if task is due today
+        task_due = task.get('due')
+        is_today = False
+        if task_due:
+            try:
+                # Parse the due date and check if it's today
+                task_date = datetime.fromisoformat(task_due.replace('Z', '+00:00')).date()
+                is_today = task_date == date
+            except:
+                pass
+        
+        # Only include tasks due today
+        if is_today:
+            if task.get("status") == "completed":
+                completed.append(task)
+            else:
+                incomplete_tasks.append(task)
+    
+    tasks = incomplete_tasks
+    
+    # Separate completed and incomplete tasks
+    incomplete_tasks = []
+    for task in tasks:
+        if task.get("status") == "completed":
+            completed.append(task)
+        else:
+            incomplete_tasks.append(task)
+    
+    tasks = incomplete_tasks
+
+    return [tasks, completed]
+
+"""
+Function that will list task and events for a specific day.
+"""
+def get_list(creds, calendar_id: str = "primary", tasklist_id: str = "@default", day: str = None) -> dict:
+    
+    # Default completed array set to nothing
+    completed = []
+
+    # If no day is provided, use today's date in Pacific timezone
+    pacific = ZoneInfo("America/Los_Angeles")
+
+    # Build the Google calendar and tasks services
+    calendar_service = build("calendar", "v3", credentials=creds)
+    task_service = build("tasks", "v1", credentials=creds)
+
+    # Define the time range for today using Pacific Time
+    pacific = ZoneInfo("America/Los_Angeles")
+    now_pacific = datetime.now(pacific)
+    date = now_pacific.date()
+    start_of_day = datetime.combine(date, datetime.min.time(), tzinfo=pacific).asttimezone(ZoneInfo("UTC")).isoformat().replace('+00:00', 'Z')
+    end_of_day = datetime.combine(date, datetime.max.time(), tzinfo=pacific).astimezone(ZoneInfo("UTC")).isoformat().replace('+00:00', 'Z')
+
+    # If there is no specific day, assume today
+    if not day:
+        # Use todays date
+        day = date.isoformat()
+
+        # Fetch todays events and tasks from Google Calendar
+        try:
+
+            # Get events for today
+            events_result = calendar_service.events().list(
+                calendarId=calendar_id,
+                timeMin=start_of_day,
+                timeMax=end_of_day,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+
+            # Get tasks for today
+            task_results = task_service.tasks().list(
+                tasklist=tasklist_id,
+                showCompleted=True,
+                showHidden=True
+            ).execute()
+
+            # Results from getting items
+            events = events_result.get('items', [])
+            tasks = task_results.get('items', [])
+
+        except Exception as e:
+            print(f"Error fetching calendar events: {e}")
+            events = []
+
+    # Use openai to return the correct date format if a specific day is provided
+    correct_date = get_date_response(day)
+
+    # Get all tasks and events for the specific day
+    try:
+        
+        # Get events for the specific day
+        events_result = calendar_service.events().list(
+            calendarId=calendar_id,
+            timeMin=f"{correct_date}T00:00:00Z",
+            timeMax=f"{correct_date}T23:59:59Z",
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        # Get tasks for the specific day
+        task_results = task_service.tasks().list(
+            tasklist=tasklist_id,
+            showCompleted=True,
+            showHidden=True
+        ).execute()
+
+        # Results from getting items
+        events = events_result.get('items', [])
+        tasks = task_results.get('items', [])
+
+        complete_tasks = sort_completed_tasks(tasks, correct_date)
+        # Returns [uncompleted array, completed array]
+
+        uncompleted_tasks = complete_tasks[0]
+        completed_tasks = complete_tasks[1]
+
+    except Exception as e:
+        print(f"Error fetching calendar events: {e}")
+        events = []
+        uncompleted_tasks = ["error"]
+        completed_tasks = ["error"]
+
+    # Return the events and tasks for the day
+    return {
+        "events": events,
+        "tasks": uncompleted_tasks,
+        "completed": completed_tasks
+    }
 
 """
 Function to list all of the current task and events on the users calendar for current day.
